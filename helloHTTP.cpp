@@ -80,18 +80,42 @@ int main() {
 
         std::cout << "Incoming connection accepted" << std::endl;
 
-        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
-        send(client_socket, response, strlen(response), 0);
+        // Check that the request is formatted politely
+        // Receive the HTTP request from the client
+        char buffer[1024];
+        int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        if (bytes_received > 0) {
+            string request(buffer, bytes_received);
+
+            // Extract the content of the request
+            string name;
+            size_t start_pos = request.find("-d ") + 3; // Find the start of the data
+            size_t end_pos = request.find("\r\n", start_pos); // Find the end of the data
+            if (start_pos != string::npos && end_pos != string::npos) {
+                name = request.substr(start_pos, end_pos - start_pos);
+            }
+                
+            // Check if the request contains the string "Shane"
+            // if (request.find("Shane") != std::string::npos) {
+            // Construct the response based on the content of the request
+            string response = "HTTP/1.1 200 OK\r\nContent-Length: " + to_string(4 + name.length()) + "\r\n\r\nHi " + name;
+            const char* response_cstr = response.c_str(); // Convert std::string to const char*
+            send(client_socket, response_cstr, strlen(response_cstr), 0);
+        } else {
+            const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
+            send(client_socket, response, strlen(response), 0);
+        }
+        
     
         // Shutdown the socket to prevent further sends/receives
         shutdown(client_socket, SD_SEND);
 
-        // Receive any remaining data from the client
-        char buffer[1024];
-        int bytes_received;
-        do {
-            bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
-        } while (bytes_received > 0);
+        // // Receive any remaining data from the client
+        // char buffer[1024];
+        // int bytes_received;
+        // do {
+        //     bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        // } while (bytes_received > 0);
 
         // Close the client socket
         closesocket(client_socket);
