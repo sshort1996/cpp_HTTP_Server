@@ -1,5 +1,5 @@
 /*
-1. Create a socket for listening on a specific port (e.g., port 8080)
+1. Create a socket for listening on a specific port (e.g., port 5000)
 2. Bind the socket to the port
 3. Listen for incoming connections
 4. Accept incoming connections
@@ -19,7 +19,7 @@
 using namespace std;
 
 int main() {
-    
+
     // Initialize Winsock
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -39,10 +39,11 @@ int main() {
     std::cout << "Socket created successfully" << std::endl;
 
     // Bind the socket to a specific port
+    int socket_port = 5000;
     sockaddr_in server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Bind to localhost
-    server_address.sin_port = htons(8080); // Bind to port 8080
+    server_address.sin_port = htons(socket_port); // Bind to port socket_port
 
     if (bind(server_socket, (sockaddr*)&server_address, sizeof(server_address)) == SOCKET_ERROR) {
         std::cerr << "Bind failed with error: " << WSAGetLastError() << std::endl;
@@ -51,29 +52,39 @@ int main() {
         return 1;
     }
 
-    std::cout << "Socket bound to localhost on port 8080 successfully" << std::endl;
+    std::cout << "Socket bound to localhost on port " << socket_port << " successfully" << std::endl;
 
-    // // Listen for incoming connections
-    // listen(socket)
+    // Listen for incoming connections
+    if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) { 
+        std::cerr << "Listen failed with error: " << WSAGetLastError() << std::endl; 
+        closesocket(server_socket); 
+        WSACleanup(); 
+        return 1; 
+    }
+    else{
+        cout << "Listening on port " << socket_port;
+    }
 
-    // while true:
-    //     // Accept incoming connection
-    //     client_socket = accept_connection(socket)
+    while (true) {
+        SOCKET client_socket;
+        sockaddr_in client_address;
+        int client_address_size = sizeof(client_address);
 
-    //     // Receive HTTP request from client
-    //     request = receive_request(client_socket)
+        client_socket = accept(server_socket, (sockaddr*)&client_address, &client_address_size);
+        if (client_socket == INVALID_SOCKET) {
+            std::cerr << "Accept failed with error: " << WSAGetLastError() << std::endl;
+            closesocket(server_socket);
+            WSACleanup();
+            return 1;
+        }
 
-    //     // Parse the request to extract the requested resource
-    //     requested_resource = parse_request(request)
+        std::cout << "Incoming connection accepted" << std::endl;
 
-    //     // Check the requested resource and generate an appropriate response
-    //     response = generate_response(requested_resource)
+        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
+        send(client_socket, response, strlen(response), 0);
 
-    //     // Send the HTTP response back to the client
-    //     send_response(client_socket, response)
-
-    //     // Close the connection
-    //     close_connection(client_socket)
+        closesocket(client_socket);
+    }
 
     // // Close the listening socket
     closesocket(server_socket);
