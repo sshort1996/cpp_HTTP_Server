@@ -82,7 +82,18 @@ int main() {
 
         const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
         send(client_socket, response, strlen(response), 0);
+    
+        // Shutdown the socket to prevent further sends/receives
+        shutdown(client_socket, SD_SEND);
 
+        // Receive any remaining data from the client
+        char buffer[1024];
+        int bytes_received;
+        do {
+            bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        } while (bytes_received > 0);
+
+        // Close the client socket
         closesocket(client_socket);
     }
 

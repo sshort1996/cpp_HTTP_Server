@@ -271,3 +271,74 @@ We bind the socket created above to a specific socket (in this case localhost 80
     closesocket(server_socket);
     WSACleanup();
 ```
+
+## Listening for incoming requests on this socket
+
+To accept incoming requests we need to first tell the socket to listen.
+```cpp
+// Listen for incoming connections
+if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) { 
+	std::cerr << "Listen failed with error: " << WSAGetLastError() << std::endl; 
+	closesocket(server_socket); 
+	WSACleanup(); 
+	return 1; 
+}
+```
+We then accept incoming requests in a loop and respond "Hello World" to them
+```cpp
+    while (true) {
+        SOCKET client_socket;
+        sockaddr_in client_address;
+        int client_address_size = sizeof(client_address);
+  
+        client_socket = accept(server_socket, (sockaddr*)&client_address, &client_address_size);
+        if (client_socket == INVALID_SOCKET) {
+            std::cerr << "Accept failed with error: " << WSAGetLastError() << std::endl;
+            closesocket(server_socket);
+            WSACleanup();
+            return 1;
+        }
+  
+        std::cout << "Incoming connection accepted" << std::endl;
+  
+        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
+        send(client_socket, response, strlen(response), 0);
+  
+        closesocket(client_socket);
+    }
+```
+The problem here is we are note closing the client socket correctly. It will work once but then susequent requests will lead to undefined behaviour. To fix this we shutdown the socket after responding, and then receive any remaining data before closing the socket altogether. Corrected code here
+
+```cpp
+    while (true) {
+        SOCKET client_socket;
+        sockaddr_in client_address;
+        int client_address_size = sizeof(client_address);
+  
+        client_socket = accept(server_socket, (sockaddr*)&client_address, &client_address_size);
+        if (client_socket == INVALID_SOCKET) {
+            std::cerr << "Accept failed with error: " << WSAGetLastError() << std::endl;
+            closesocket(server_socket);
+            WSACleanup();
+            return 1;
+        }
+  
+        std::cout << "Incoming connection accepted" << std::endl;
+  
+        const char* response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!";
+        send(client_socket, response, strlen(response), 0);
+        // Shutdown the socket to prevent further sends/receives
+        shutdown(client_socket, SD_SEND);
+  
+        // Receive any remaining data from the client
+        char buffer[1024];
+        int bytes_received;
+        do {
+            bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        } while (bytes_received > 0);
+  
+        // Close the client socket
+        closesocket(client_socket);
+    }
+```
+The server can now handle multiple connections without having undefined behaviour.
